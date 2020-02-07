@@ -7,10 +7,12 @@ import os
 # Save file to MattersWithFL.txt
 # Run ParseFLTrainings.py - it will populate PrecisionsText folder
 # Run this script - it will populate ConfusionSource folder and then generate a report called report.csv
+# and report_general.csv
 
 # REPORT INTERPRETATION
 # For any matter with similar tags in more than one language that both have positive and negative signals above 1000,
-# the report will include the differences between the recall and f-score (beta = 0.5) between tags across languages pairs.
+# the report.csv will include the differences between the recall and f-score (beta = 0.5) between tags across
+# languages pairs.  The report_general.csv will be the average, minimum, and maximum recalls for English tags by matter.
 
 
 class tagItem:
@@ -101,7 +103,6 @@ def generateReport():
         for file in files:
             if file != '.DS_Store':
                 path = os.path.join(subdir, file)
-                print()
                 # print(f'File: {file}')
                 # print('Tag Name\t | Languages\t | Pos Recall Diff')
                 tag_list = getConfusionData(path)
@@ -113,8 +114,8 @@ def generateReport():
                     while index2 <= indexMax:
                         tag2 = tag_list[index2]
                         if tag1.tag_name == tag2.tag_name and tag1.positive_signals > 999 and tag2.positive_signals > 999 and tag1.negative_signals > 999 and tag2.negative_signals > 999:
-                            pos_recall_diff = abs(tag2.pos_recall - tag1.pos_recall)
-                            pos_fscore_diff = abs(tag1.f_score - tag2.f_score)
+                            pos_recall_diff = tag2.pos_recall - tag1.pos_recall
+                            pos_fscore_diff = tag1.f_score - tag2.f_score
                             output.append((file,tag1.tag_name,tag1.language,tag2.language,pos_recall_diff,pos_fscore_diff))
                             # print(f'| {tag1.tag_name}\t | {tag1.language} / {tag2.language}\t | {pos_recall_diff:.1%} | {pos_fscore_diff:.1%}')
                         index2 += 1
@@ -123,8 +124,44 @@ def generateReport():
         csvwriter = csv.writer(csvfile, delimiter=',')
         csvwriter.writerows(output)
 
+def generateGeneralReport():
+    output = []
+    output.append(('file', 'pos_recall_avg', 'pos_recall_min','pos_recall_max'))
+    for subdir, dirs, files in os.walk('ConfusionSource'):
+        for file in files:
+            if file != '.DS_Store':
+                path = os.path.join(subdir, file)
+                tag_list = getConfusionData(path)
+                recall_count = 0
+                recall_total = 0
+                recall_min = 0
+                recall_max = 0
+                for tag in tag_list:
+                    if tag.positive_signals > 999 and tag.negative_signals > 999 and tag.language == 'en' and tag.pos_recall > 0:
+                        if recall_count == 0:
+                            recall_min = float(tag.pos_recall)
+                            recall_max = float(tag.pos_recall)
+                        else:
+                            if float(tag.pos_recall) < recall_min:
+                                recall_min = float(tag.pos_recall)
+                            if float(tag.pos_recall) > recall_max:
+                                recall_max = float(tag.pos_recall)
+                        recall_total += float(tag.pos_recall)
+                        recall_count += 1
+                if recall_count > 0:
+                    recall_avg = recall_total / recall_count
+                else:
+                    recall_avg = 0
+                output.append((file, recall_avg, recall_min, recall_max))
+
+
+    with open('report_general.csv', 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile, delimiter=',')
+        csvwriter.writerows(output)
+
 def main():
     # cleanPrecisionsText()
     generateReport()
+    generateGeneralReport()
 
 main()
